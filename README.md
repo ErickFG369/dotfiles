@@ -1,4 +1,4 @@
-# Dotfiles
+# 🛠️ Erick's Universal Dotfiles
 
 Repositório contendo meus **dotfiles universais** e script de bootstrap para configurar rapidamente um ambiente Linux em:
 
@@ -42,12 +42,22 @@ Clone o repositório:
 ```bash
 git clone https://github.com/ErickFG369/dotfiles.git
 cd dotfiles
+
+---
+
 Dê permissão de execução:
 
 chmod +x install.sh
+
+---
+
 Execute:
 
+```bash
 ./install.sh
+
+---
+
 🧠 Como funciona
 O script:
 
