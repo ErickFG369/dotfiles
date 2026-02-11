@@ -2,21 +2,31 @@
 
 # Cores para o terminal
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}==> Iniciando a automação do sistema...${NC}"
 
-# 1. Atualizar repositórios e instalar dependências básicas
-echo -e "${GREEN}==> Instalando dependências (git, stow, fastfetch, etc)...${NC}"
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl git stow fastfetch imagemagick
+# 1. Detecção do Gerenciador de Pacotes e instalação de dependências
+if [ -x "$(command -v apt)" ]; then
+    echo -e "${GREEN}==> Sistema baseado em Debian/Ubuntu detectado...${NC}"
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install -y curl git stow fastfetch imagemagick
+elif [ -x "$(command -v pacman)" ]; then
+    echo -e "${GREEN}==> Sistema baseado em Arch Linux detectado...${NC}"
+    sudo pacman -Syu --noconfirm
+    sudo pacman -S --noconfirm curl git stow fastfetch imagemagick
+else
+    echo -e "${RED}Erro: Gerenciador de pacotes não suportado!${NC}"
+    exit 1
+fi
 
 # 2. Instalar o Kitty Terminal (se não estiver instalado)
 if [ ! -d "$HOME/.local/kitty.app" ]; then
     echo -e "${GREEN}==> Instalando Kitty Terminal...${NC}"
     curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
     
-    # Desktop Integration (como fizemos no início)
+    # Desktop Integration
     mkdir -p ~/.local/bin
     ln -sf ~/.local/kitty.app/bin/kitty ~/.local/kitty.app/bin/kitten ~/.local/bin/
     cp ~/.local/kitty.app/share/applications/kitty.desktop ~/.local/share/applications/
