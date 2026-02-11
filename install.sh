@@ -1,44 +1,126 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
-# Cores para o terminal
+# ==============================
+#  CONFIGURAÇÕES
+# ==============================
+
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-echo -e "${GREEN}==> Iniciando a automação do sistema...${NC}"
+DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 1. Detecção do Gerenciador de Pacotes e instalação de dependências
-if [ -x "$(command -v apt)" ]; then
-    echo -e "${GREEN}==> Sistema baseado em Debian/Ubuntu detectado...${NC}"
-    sudo apt update && sudo apt upgrade -y
-    sudo apt install -y curl git stow fastfetch imagemagick
-elif [ -x "$(command -v pacman)" ]; then
-    echo -e "${GREEN}==> Sistema baseado em Arch Linux detectado...${NC}"
-    sudo pacman -Syu --noconfirm
-    sudo pacman -S --noconfirm curl git stow fastfetch imagemagick
-else
-    echo -e "${RED}Erro: Gerenciador de pacotes não suportado!${NC}"
+CLI_PACKAGES=(curl git stow fastfetch imagemagick)
+FLATPAK_APPS=(
+    com.visualstudio.code
+    com.brave.Browser
+    org.videolan.VLC
+    com.xnview.XnViewMP
+)
+
+# ==============================
+#  FUNÇÕES
+# ==============================
+
+log() {
+    echo -e "${GREEN}==>${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}==>${NC} $1"
+}
+
+error() {
+    echo -e "${RED}Erro:${NC} $1"
     exit 1
-fi
+}
 
-# 2. Instalar o Kitty Terminal (se não estiver instalado)
-if [ ! -d "$HOME/.local/kitty.app" ]; then
-    echo -e "${GREEN}==> Instalando Kitty Terminal...${NC}"
-    curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin
-    
-    # Desktop Integration
-    mkdir -p ~/.local/bin
-    ln -sf ~/.local/kitty.app/bin/kitty ~/.local/kitty.app/bin/kitten ~/.local/bin/
-    cp ~/.local/kitty.app/share/applications/kitty.desktop ~/.local/share/applications/
-    sed -i "s|Icon=kitty|Icon=$(readlink -f ~)/.local/kitty.app/share/icons/hicolor/256x256/apps/kitty.png|g" ~/.local/share/applications/kitty*.desktop
-    sed -i "s|Exec=kitty|Exec=$(readlink -f ~)/.local/kitty.app/bin/kitty|g" ~/.local/share/applications/kitty*.desktop
-fi
+detect_package_manager() {
+    if command -v apt &> /dev/null; then
+        PKG_MANAGER="apt"
+    elif command -v pacman &> /dev/null; then
+        PKG_MANAGER="pacman"
+    elif command -v dnf &> /dev/null; then
+        PKG_MANAGER="dnf"
+    else
+        error "Gerenciador de pacotes não suportado."
+    fi
+}
 
-# 3. Aplicar as configurações usando o GNU Stow
-echo -e "${GREEN}==> Aplicando configurações com GNU Stow...${NC}"
-cd ~/dotfiles
-stow kitty
-stow fastfetch
-stow bash
+install_cli_packages() {
+    log "Instalando dependências CLI..."
 
-echo -e "${GREEN}==> Tudo pronto! Reinicie o seu terminal.${NC}"
+    case $PKG_MANAGER in
+        apt)
+            sudo apt update
+            sudo apt install -y "${CLI_PACKAGES[@]}" flatpak
+            ;;
+        pacman)
+            sudo pacman -Sy --noconfirm "${CLI_PACKAGES[@]}" flatpak
+            ;;
+        dnf)
+            sudo dnf install -y "${CLI_PACKAGES[@]}" flatpak
+            ;;
+    esac
+}
+
+setup_flatpak() {
+    if ! flatpak remote-list | grep -q flathub; then
+        log "Adicionando Flathub..."
+        sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    else
+        warn "Flathub já configurado."
+    fi
+}
+
+install_flatpak_apps() {
+    log "Instalando aplicativos Flatpak..."
+
+    for app in "${FLATPAK_APPS[@]}"; do
+        if ! flatpak list | grep -q "$app"; then
+            flatpak install -y flathub "$app"
+        else
+            warn "$app já está instalado."
+        fi
+    done
+}
+
+install_kitty() {
+    if ! command -v kitty &> /dev/null; then
+        log "Instalando Kitty..."
+        curl -L -o kitty-installer.sh https://sw.kovidgoyal.net/kitty/installer.sh
+        sh kitty-installer.sh
+        rm kitty-installer.sh
+    else
+        warn "Kitty já instalado."
+    fi
+}
+
+apply_dotfiles() {
+    log "Aplicando dotfiles com GNU Stow..."
+    cd "$DOTFILES_DIR"
+
+    for dir in */; do
+        if [ -d "$dir" ] && [ "$dir" != "bootstrap/" ]; then
+            stow -v "${dir%/}"
+        fi
+    done
+}
+
+# ==============================
+#  EXECUÇÃO
+# ==============================
+
+log "Iniciando setup universal..."
+
+detect_package_manager
+install_cli_packages
+setup_flatpak
+install_flatpak_apps
+install_kitty
+apply_dotfiles
+
+log "Setup concluído com sucesso!"
+log "Reinicie sua sessão se necessário."
