@@ -1,4 +1,4 @@
-# 🛠️ Erick's Universal Dotfiles
+# Dotfiles
 
 Repositório contendo meus **dotfiles universais** e script de bootstrap para configurar rapidamente um ambiente Linux em:
 
