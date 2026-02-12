@@ -18,6 +18,8 @@ Abra o terminal e baixe os arquivos para a sua pasta pessoal:
 ```bash
 git clone [https://github.com/ErickFG369/dotfiles.git](https://github.com/ErickFG369/dotfiles.git) ~/dotfiles
 
+---
+
 ### 2. Execute o Framework de Setup:
 
 ```Bash
