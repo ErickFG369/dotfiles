@@ -93,6 +93,11 @@ install_kitty() {
         curl -L -o kitty-installer.sh https://sw.kovidgoyal.net/kitty/installer.sh
         sh kitty-installer.sh
         rm kitty-installer.sh
+
+        # Criar atalhos apenas após a instalação
+        mkdir -p ~/.local/bin
+        ln -sf ~/.local/kitty.app/bin/kitty ~/.local/bin/
+        ln -sf ~/.local/kitty.app/bin/kitten ~/.local/bin/
     else
         warn "Kitty já instalado."
     fi
