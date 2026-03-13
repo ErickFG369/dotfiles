@@ -115,5 +115,7 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-# Executa o fastfetch ao abrir o terminal
-fastfetch
+# Executa o fastfetch apenas se ele estiver instalado
+if command -v fastfetch &> /dev/null; then
+    fastfetch
+fi
