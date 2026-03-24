@@ -104,6 +104,10 @@ install_kitty() {
 }
 
 apply_dotfiles() {
+    log "Removendo arquivos padrão para evitar conflitos..."
+    rm -f ~/.bashrc # Remove o arquivo real para o stow poder criar o link
+    # ... resto da função
+
     log "Aplicando dotfiles com GNU Stow..."
     cd "$DOTFILES_DIR"
 
