@@ -12,7 +12,8 @@ NC='\033[0m'
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-CLI_PACKAGES=(curl git stow fastfetch imagemagick)
+# Removido fastfetch daqui para instalar a versão mais recente via função específica
+CLI_PACKAGES=(curl git stow imagemagick wget)
 FLATPAK_APPS=(
     com.visualstudio.code
     com.brave.Browser
@@ -40,10 +41,13 @@ error() {
 detect_package_manager() {
     if command -v apt &> /dev/null; then
         PKG_MANAGER="apt"
+        INSTALL_CMD="install -y"
     elif command -v pacman &> /dev/null; then
         PKG_MANAGER="pacman"
+        INSTALL_CMD="-S --noconfirm"
     elif command -v dnf &> /dev/null; then
         PKG_MANAGER="dnf"
+        INSTALL_CMD="install -y"
     else
         error "Gerenciador de pacotes não suportado."
     fi
@@ -51,19 +55,12 @@ detect_package_manager() {
 
 install_cli_packages() {
     log "Instalando dependências CLI..."
-
-    case $PKG_MANAGER in
-        apt)
-            sudo apt update
-            sudo apt install -y "${CLI_PACKAGES[@]}" flatpak
-            ;;
-        pacman)
-            sudo pacman -Sy --noconfirm "${CLI_PACKAGES[@]}" flatpak
-            ;;
-        dnf)
-            sudo dnf install -y "${CLI_PACKAGES[@]}" flatpak
-            ;;
-    esac
+    if [ "$PKG_MANAGER" == "apt" ]; then
+        sudo apt update
+        sudo apt install -y "${CLI_PACKAGES[@]}" flatpak
+    else
+        sudo $PKG_MANAGER $INSTALL_CMD "${CLI_PACKAGES[@]}" flatpak
+    fi
 }
 
 setup_flatpak() {
@@ -77,7 +74,6 @@ setup_flatpak() {
 
 install_flatpak_apps() {
     log "Instalando aplicativos Flatpak..."
-
     for app in "${FLATPAK_APPS[@]}"; do
         if ! flatpak list | grep -q "$app"; then
             flatpak install -y flathub "$app"
@@ -87,14 +83,28 @@ install_flatpak_apps() {
     done
 }
 
+install_fastfetch_latest() {
+    if [ "$PKG_MANAGER" == "apt" ]; then
+        if ! command -v fastfetch &> /dev/null; then
+            log "Baixando versão mais recente do Fastfetch..."
+            wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb
+            sudo apt install -y /tmp/fastfetch.deb
+            rm /tmp/fastfetch.deb
+        fi
+    else
+        log "Instalando Fastfetch via gerenciador nativo..."
+        sudo $PKG_MANAGER $INSTALL_CMD fastfetch
+    fi
+}
+
 install_kitty() {
     if ! command -v kitty &> /dev/null; then
         log "Instalando Kitty..."
         curl -L -o kitty-installer.sh https://sw.kovidgoyal.net/kitty/installer.sh
         sh kitty-installer.sh
         rm kitty-installer.sh
-
-        # Criar atalhos apenas após a instalação
+        
+        # Criar atalhos para o sistema reconhecer o Kitty
         mkdir -p ~/.local/bin
         ln -sf ~/.local/kitty.app/bin/kitty ~/.local/bin/
         ln -sf ~/.local/kitty.app/bin/kitten ~/.local/bin/
@@ -104,12 +114,14 @@ install_kitty() {
 }
 
 apply_dotfiles() {
-    log "Removendo arquivos padrão para evitar conflitos..."
-    rm -f ~/.bashrc # Remove o arquivo real para o stow poder criar o link
-    # ... resto da função
-
     log "Aplicando dotfiles com GNU Stow..."
     cd "$DOTFILES_DIR"
+
+    # Remove o .bashrc original para evitar conflito com o Stow
+    if [ -f "$HOME/.bashrc" ] && [ ! -L "$HOME/.bashrc" ]; then
+        warn "Removendo .bashrc original para aplicar dotfiles..."
+        rm "$HOME/.bashrc"
+    fi
 
     for dir in */; do
         if [ -d "$dir" ] && [ "$dir" != "bootstrap/" ]; then
@@ -122,14 +134,15 @@ apply_dotfiles() {
 #  EXECUÇÃO
 # ==============================
 
-log "Iniciando setup universal..."
+log "Iniciando setup universal do Erick..."
 
 detect_package_manager
 install_cli_packages
 setup_flatpak
 install_flatpak_apps
+install_fastfetch_latest
 install_kitty
 apply_dotfiles
 
 log "Setup concluído com sucesso!"
-log "Reinicie sua sessão se necessário."
+log "Reinicie o seu terminal ou sessão."
