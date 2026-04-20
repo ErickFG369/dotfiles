@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # ==============================
 #  CONFIGURAÇÕES
@@ -98,36 +98,59 @@ install_fastfetch_latest() {
 }
 
 install_kitty() {
-    if ! command -v kitty &> /dev/null; then
-        log "Instalando Kitty..."
-        curl -L -o kitty-installer.sh https://sw.kovidgoyal.net/kitty/installer.sh
-        sh kitty-installer.sh
-        rm kitty-installer.sh
-        
-        # Criar atalhos para o sistema reconhecer o Kitty
-        mkdir -p ~/.local/bin
-        ln -sf ~/.local/kitty.app/bin/kitty ~/.local/bin/
-        ln -sf ~/.local/kitty.app/bin/kitten ~/.local/bin/
-    else
-        warn "Kitty já instalado."
+    if command -v kitty &> /dev/null; then
+        warn "Kitty já instalado ($(kitty --version 2>/dev/null | head -1))."
+        return 0
     fi
+
+    log "Instalando Kitty..."
+    curl -L https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n
+
+    # Criar atalhos para o sistema reconhecer o Kitty
+    mkdir -p ~/.local/bin
+    ln -sf ~/.local/kitty.app/bin/kitty ~/.local/bin/
+    ln -sf ~/.local/kitty.app/bin/kitten ~/.local/bin/
+
+    # Adicionar entrada no menu de aplicativos
+    mkdir -p ~/.local/share/applications ~/.local/share/icons
+    cp ~/.local/kitty.app/share/applications/kitty.desktop ~/.local/share/applications/ 2>/dev/null || true
+    cp ~/.local/kitty.app/share/icons/hicolor/256x256/apps/kitty.png ~/.local/share/icons/ 2>/dev/null || true
+    sed -i "s|Icon=kitty|Icon=$HOME/.local/share/icons/kitty.png|g" ~/.local/share/applications/kitty.desktop 2>/dev/null || true
 }
 
 apply_dotfiles() {
     log "Aplicando dotfiles com GNU Stow..."
     cd "$DOTFILES_DIR"
 
-    # Remove o .bashrc original para evitar conflito com o Stow
+    # Faz backup do .bashrc original em vez de deletar (segurança)
     if [ -f "$HOME/.bashrc" ] && [ ! -L "$HOME/.bashrc" ]; then
-        warn "Removendo .bashrc original para aplicar dotfiles..."
+        warn "Fazendo backup do .bashrc original em ~/.bashrc.bak..."
+        cp "$HOME/.bashrc" "$HOME/.bashrc.bak"
         rm "$HOME/.bashrc"
     fi
 
-    for dir in */; do
-        if [ -d "$dir" ] && [ "$dir" != "bootstrap/" ]; then
-            stow -v "${dir%/}"
+    # Lista explícita de pacotes Stow (evita processar pastas não-dotfiles no futuro)
+    STOW_PACKAGES=(bash kitty fastfetch)
+
+    for pkg in "${STOW_PACKAGES[@]}"; do
+        if [ -d "$pkg" ]; then
+            log "Aplicando: $pkg"
+            # --no-folding garante que pastas existentes (.config/kitty) não sejam substituídas por symlinks
+            stow -v --no-folding "$pkg" 2>&1 || {
+                warn "Conflito ao aplicar '$pkg'. Tentando restow..."
+                stow -v --no-folding --restow "$pkg" 2>&1 || warn "Não foi possível aplicar '$pkg'. Verifique conflitos manualmente."
+            }
+        else
+            warn "Pasta '$pkg' não encontrada, pulando..."
         fi
     done
+
+    # Aviso sobre current-theme.conf do Kitty (não está no repositório)
+    if [ ! -f "$HOME/.config/kitty/current-theme.conf" ]; then
+        warn "Tema do Kitty não encontrado. Execute dentro do Kitty:"
+        warn "  kitten themes"
+        warn "E escolha 'Tokyo Night' para aplicar o tema."
+    fi
 }
 
 # ==============================

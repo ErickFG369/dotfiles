@@ -16,7 +16,7 @@ Para replicar meu setup em uma instalação limpa do Ubuntu, basta seguir estes 
 ### 1. Clonar o repositório
 Abra o terminal e baixe os arquivos para a sua pasta pessoal:
 ```bash
-git clone [https://github.com/ErickFG369/dotfiles.git](https://github.com/ErickFG369/dotfiles.git) ~/dotfiles
+git clone https://github.com/ErickFG369/dotfiles.git ~/dotfiles
 
 ---
 
